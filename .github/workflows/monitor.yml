@@ -1,0 +1,52 @@
+name: Monitor de Preços Automatizado01
+
+on:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:          # Permite rodar manualmente pelo painel do GitHub
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: pip install curl_cffi requests
+
+      # ==========================================
+      # CENTAURO
+      # ==========================================
+      - name: Rodar Monitor Centauro
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python centauro.py
+        continue-on-error: true # Se der erro, não para a execução das outras lojas
+
+      # ==========================================
+      # NAGUMO
+      # ==========================================
+      - name: Rodar Monitor Nagumo
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python nagumo.py
+        continue-on-error: true
+
+      # ==========================================
+      # SHIBATA
+      # ==========================================
+      - name: Rodar Monitor Shibata
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python shibata.py
+        continue-on-error: true
