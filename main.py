@@ -7,9 +7,9 @@ from bs4 import BeautifulSoup
 import streamlit as st
 
 st.set_page_config(page_title="MediaFire Dynamic Player", page_icon="🎬", layout="centered")
-st.title("🎬 Player Dinâmico")
+st.title("🎬 Player Dinâmico (Vídeo em Partes de 400MB)")
 
-st.warning("⚠️ **Info:** 900mb por fragmento.")
+st.warning("⚠️ **Aviso de Armazenamento:** Certifique-se de ter espaço em disco disponível para comportar os fragmentos gerados.")
 
 LOCAL_STATIC_DIR = "static"
 os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
@@ -27,6 +27,8 @@ if "base_duration" not in st.session_state:
     st.session_state.base_duration = 0.0
 if "total_duration" not in st.session_state:
     st.session_state.total_duration = 0.0
+if "selected_part_index" not in st.session_state:
+    st.session_state.selected_part_index = 0
 
 def get_mediafire_direct_link(url):
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -69,6 +71,7 @@ def clear_cache():
     for f in glob.glob(os.path.join(LOCAL_STATIC_DIR, "part_*.mp4")):
         if os.path.exists(f): os.remove(f)
     if os.path.exists(SAVE_PATH): os.remove(SAVE_PATH)
+    st.session_state.selected_part_index = 0
 
 # Campo para colar a URL do Mediafire
 url_input = st.text_input("Cole a URL do MediaFire aqui:", placeholder="https://www.mediafire.com/file/...", disabled=st.session_state.processing)
@@ -87,7 +90,7 @@ if st.button("📥 Processar Vídeo", use_container_width=True, disabled=st.sess
             
             # Limite estrito de 400MB para total estabilidade do streaming
             total_size = os.path.getsize(SAVE_PATH)
-            max_part_size = 900 * 1024 * 1024  # 400 MB reais
+            max_part_size = 400 * 1024 * 1024  
             st.session_state.num_parts = math.ceil(total_size / max_part_size)
             
             duration = get_video_duration(SAVE_PATH)
@@ -145,16 +148,86 @@ st.subheader("🎬 Visualizador de Partes")
 available_parts = [os.path.basename(f) for f in glob.glob(os.path.join(LOCAL_STATIC_DIR, "part_*.mp4"))]
 available_parts.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
+# Injeta CSS para ocultar estruturalmente o botão secreto de navegação do Streamlit
+st.markdown("<style>.hidden-btn-container { display: none !important; }</style>", unsafe_allow_html=True)
+
 if available_parts:
+    # Ajusta salvaguarda do index do selectbox
+    if st.session_state.selected_part_index >= len(available_parts):
+        st.session_state.selected_part_index = len(available_parts) - 1
+
+    def on_selectbox_change():
+        st.session_state.selected_part_index = available_parts.index(st.session_state.current_selected_part)
+
     selected_part = st.selectbox(
         "Selecione qual parte deseja reproduzir:",
         options=available_parts,
-        index=len(available_parts) - 1,
+        key="current_selected_part",
+        index=st.session_state.selected_part_index,
+        on_change=on_selectbox_change,
         format_func=lambda x: f"▶️ Assistir Fragmento {x.split('_')[1].split('.')[0]}"
     )
     
-    part_path = os.path.join(LOCAL_STATIC_DIR, selected_part)
-    st.video(part_path)
+    current_idx = available_parts.index(selected_part)
+    has_next = current_idx < len(available_parts) - 1
+
+    # Criação do botão secreto que o JavaScript irá acionar programaticamente
+    st.markdown('<div class="hidden-btn-container">', unsafe_allow_html=True)
+    if st.button("SecretNextTrigger", key="go_next_part_action"):
+        if has_next:
+            st.session_state.selected_part_index = current_idx + 1
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Renderização do Player Customizado com detecção de fim de mídia e escape de Fullscreen
+    part_path = f"static/{selected_part}"
+    
+    button_html = ""
+    if has_next:
+        button_html = """
+        <button id="next-part-overlay-btn" onclick="triggerStreamlitNext()" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2147483647; padding: 18px 36px; font-size: 20px; font-weight: bold; background-color: #FF4B4B; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0px 6px 25px rgba(0,0,0,0.8); font-family: sans-serif; transition: transform 0.2s;">
+            ▶️ Assistir Próximo Fragmento
+        </button>
+        """
+
+    player_code = f"""
+    <div id="video-wrapper" style="position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center;">
+        <video id="custom-player" style="width: 100%; height: 100%; object-fit: contain;" controls src="{part_path}"></video>
+        {button_html}
+    </div>
+
+    <script>
+        var video = document.getElementById('custom-player');
+        var btn = document.getElementById('next-part-overlay-btn');
+        
+        video.addEventListener('ended', function() {{
+            // Força a saída do modo tela cheia nativo do navegador para revelar o botão perfeitamente
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {{
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                else if (document.msExitFullscreen) document.msExitFullscreen();
+            }}
+            
+            // Exibe o botão centralizado por cima do player
+            if (btn) {{
+                btn.style.display = 'block';
+            }}
+        }});
+
+        function triggerStreamlitNext() {{
+            // Localiza o botão secreto do Streamlit instalado na árvore do DOM principal e clica nele
+            var btnStreamlit = window.parent.document.querySelector('.hidden-btn-container button');
+            if (btnStreamlit) {{
+                btnStreamlit.click();
+            }} else {{
+                // Fallback de contingência local
+                var btnLocal = document.querySelector('.hidden-btn-container button');
+                if (btnLocal) btnLocal.click();
+            }}
+        }}
+    </script>
+    """
+    st.markdown(player_code, unsafe_allow_html=True)
     
     if st.session_state.processing:
         st.info(f"🔄 Gerando próximas partes... ({len(available_parts)} de {st.session_state.num_parts} concluídas)")
