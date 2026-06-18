@@ -6,7 +6,7 @@ import streamlit as st
 st.set_page_config(page_title="MediaFire 6GB Player", page_icon="🎬", layout="centered")
 st.title("🎬 Player Inabalável para Arquivos Grandes (6 GB+)")
 
-# Salva na pasta static local para o Streamlit servir direto do HD (Consumo zero de RAM)
+# Salva na pasta static local para o Streamlit servir direto do HD
 LOCAL_STATIC_DIR = "static"
 os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
 VIDEO_FILENAME = "video_local_player.mp4"
@@ -89,21 +89,24 @@ with col2:
         except Exception as e:
             st.error(f"Erro: {e}")
 
-# Renderização segura via HTML nativo injetado no DOM principal do Streamlit
+# Renderização corrigida e otimizada para o arquivo local
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
-    st.subheader("🎬 Player Local via Stream Estático (Suporta avanço e arquivos gigantes):")
+    st.subheader("🎬 Player Local (Executando direto do HD local):")
     
-    # Usando st.markdown com caminho relativo, o navegador conversa direto com o servidor web 
-    # do Streamlit (Tornado), solicitando apenas pedaços (Range Requests) do arquivo de 6GB.
+    # Caminho corrigido para o servidor estático do Streamlit
     st.markdown(
         f"""
         <div style="background-color: black; padding: 5px; border-radius: 8px;">
-            <video width="100%" height="auto" controls preload="metadata">
-                <source src="app/static/{VIDEO_FILENAME}" type="video/mp4">
-                Seu navegador não suporta HTML5 video.
+            <video width="100%" height="auto" controls preload="auto">
+                <source src="static/{VIDEO_FILENAME}" type="video/mp4">
+                Seu navegador não suporta a reprodução deste arquivo local.
             </video>
         </div>
         """,
         unsafe_allow_html=True
     )
+    
+    # Botão de contingência absoluta para abrir o arquivo local direto em tela cheia no navegador
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.link_button("📺 Abrir Player Nativo em Nova Aba", f"static/{VIDEO_FILENAME}", use_container_width=True)
