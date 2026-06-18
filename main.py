@@ -6,7 +6,7 @@ st.set_page_config(page_title="MediaFire Video Player", page_icon="🎬")
 st.title("🎬 Player de Vídeo - MediaFire (Suporte a 6 GB+)")
 
 # Link do vídeo
-VIDEO_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
+VIDEO_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?dkey=8j4nv0uf9vh&r=557"
 
 def get_mediafire_direct_link(url):
     """Extrai apenas a URL direta de download do MediaFire sem baixar o arquivo."""
