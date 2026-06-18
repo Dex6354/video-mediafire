@@ -1,116 +1,64 @@
-import requests
-from bs4 import BeautifulSoup
 import streamlit as st
 
 st.set_page_config(page_title="MediaFire 6GB Player", page_icon="🎬", layout="centered")
-st.title("🎬 Player MediaFire com Painel de Fallback")
 
-# Links dos vídeos do MediaFire
-VIDEO_1_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
-VIDEO_2_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?dkey=8j4nv0uf9vh&r=557"
-
-# Inicialização dos estados do ciclo de vida do player
-if "status" not in st.session_state:
-    st.session_state.status = "idle"      # Estados: idle, extraindo, pronto, erro
-if "direct_link" not in st.session_state:
-    st.session_state.direct_link = None
-if "video_nome" not in st.session_state:
-    st.session_state.video_nome = ""
-if "error_msg" not in st.session_state:
-    st.session_state.error_msg = ""
-
-def get_mediafire_direct_link(url):
-    """Extrai a URL direta de download do MediaFire."""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    try:
-        response = requests.get(url, headers=headers, timeout=12)
-        soup = BeautifulSoup(response.text, "html.parser")
-        download_button = soup.find("a", id="downloadButton")
-        if download_button:
-            return download_button.get("href")
-        return "Botão de download não encontrado na página do MediaFire."
-    except Exception as e:
-        return f"Erro de conexão com o servidor: {str(e)}"
-
-# Interface de seleção
-col1, col2 = st.columns(2)
-
-with col1:
-    if st.button("🎬 Carregar Vídeo 1 (5MB)", use_container_width=True):
-        st.session_state.status = "extraindo"
-        st.session_state.video_nome = "Vídeo 1 (Sample - 5MB)"
-        st.rerun()
-
-with col2:
-    if st.button("🎬 Carregar Vídeo 2 (6GB)", use_container_width=True):
-        st.session_state.status = "extraindo"
-        st.session_state.video_nome = "Vídeo 2 (TEVEO 1 - 6GB)"
-        st.rerun()
-
-# Processamento em Segundo Plano (Extração do Link)
-if st.session_state.status == "extraindo":
-    url_alvo = VIDEO_1_URL if "5MB" in st.session_state.video_nome else VIDEO_2_URL
-    
-    with st.spinner(f"⏳ Extraindo link direto para {st.session_state.video_nome}..."):
-        resultado = get_mediafire_direct_link(url_alvo)
-        
-        if resultado and resultado.startswith("http"):
-            st.session_state.direct_link = resultado
-            st.session_state.status = "pronto"
-        else:
-            st.session_state.error_msg = resultado
-            st.session_state.status = "erro"
-    st.rerun()
-
-# --- PAINEL VISUAL DE DIAGNÓSTICO E FALLBACK ---
+st.title("🎬 Player Web para Arquivos Grandes (6 GB+)")
 st.markdown("---")
-st.subheader("📋 Monitor de Execução do Player:")
 
-if st.session_state.status == "idle":
-    st.info("Aguardando comando do usuário. Selecione um vídeo acima para iniciar.")
+# Links compartilhados do MediaFire (Página pública)
+VIDEO_1_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file"
+VIDEO_2_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file"
 
-elif st.session_state.status == "erro":
-    st.error(f"❌ Erro Crítico ao processar o arquivo!")
-    st.code(st.session_state.error_msg, language="text")
-    if st.button("🔄 Tentar Novamente"):
-        st.session_state.status = "idle"
-        st.rerun()
+st.subheader("Escolha o método de reprodução em nuvem:")
 
-elif st.session_state.status == "pronto":
-    st.success(f"✅ Link de Streaming resolvido para: {st.session_state.video_nome}")
-    
-    if "6GB" in st.session_state.video_nome:
-        st.warning("⚠️ Nota: Vídeos de 6GB podem falhar no player HTML5 web devido a restrições do seu navegador (CORS/Timeout). Caso falhe, use as opções de Fallback abaixo.")
+tab1, tab2, tab3 = st.tabs([
+    "🌐 Método 1: Iframe Embutido", 
+    "🚀 Método 2: Engine do Navegador",
+    "⚡ Método 3: Proxy Cloudflare (Custom Player)"
+])
 
-    # Player HTML5 Padrão
-    st.markdown(
-        f"""
-        <div style="background-color: black; padding: 5px; border-radius: 8px;">
-            <video width="100%" height="auto" controls preload="metadata">
-                <source src="{st.session_state.direct_link}" type="video/mp4">
-                Seu navegador rejeitou o streaming direto deste arquivo. Use os fallbacks abaixo.
-            </video>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+with tab1:
+    st.markdown("""
+    Injeta a interface de exibição do MediaFire diretamente na página. 
+    O próprio MediaFire gerencia o streaming do arquivo de 6GB sem tocar no servidor do Streamlit.
+    """)
     
-    # Seção de Recursos de Fallback de segurança
-    st.markdown("### 🛠️ Recursos de Fallback (Se o player acima não rodar):")
+    video_sel = st.radio("Selecione o vídeo para carregar no Iframe:", ("Vídeo 1 (5MB)", "Vídeo 2 (6GB)"), key="iframe_select")
+    url_alvo = VIDEO_1_URL if "5MB" in video_sel else VIDEO_2_URL
     
-    f_col1, f_col2 = st.columns(2)
+    # Renderiza o visualizador nativo deles isolado no DOM do cliente
+    st.components.v1.iframe(url_alvo, height=600, scrolling=True)
+
+with tab2:
+    st.markdown("""
+    Delega a reprodução para a Engine nativa do seu navegador em uma nova aba. 
+    Ideal para arquivos gigantes, pois utiliza a aceleração de hardware do seu próprio PC.
+    """)
     
-    with f_col1:
-        st.markdown(
-            f'<a href="{st.session_state.direct_link}" target="_blank" style="text-decoration:none;">'
-            f'<button style="width:100%; padding:12px; background-color:#ff4b4b; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">'
-            f'📥 Opção 1: Forçar Download Direto</button></a>', 
-            unsafe_allow_html=True
-        )
-        st.caption("Baixa o arquivo em velocidade máxima diretamente pelo navegador bypassando o player.")
-        
-    with f_col2:
-        st.code(st.session_state.direct_link, language="text")
-        st.caption("💡 **Opção 2 (Recomendada para 6GB):** Copie o link acima, abra o player **VLC**, vá em *Mídia > Abrir Fluxo de Rede*, cole o link e assista instantaneamente sem gastar memória do navegador.")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.link_button("📺 Abrir Vídeo 1 (Navegador)", VIDEO_1_URL, use_container_width=True)
+    with col2:
+        st.link_button("📺 Abrir Vídeo 2 (6GB - Navegador)", VIDEO_2_URL, use_container_width=True)
+
+with tab3:
+    st.markdown("""
+    Se você precisar obrigatoriamente do player `<video>` padrão limpo na tela, a única forma em nuvem é usar um **Worker do Cloudflare** como proxy de stream para contornar o bloqueio de IP do MediaFire.
+    """)
+    
+    st.info("💡 **Como fazer:** Publique um Worker simples com o código abaixo e passe o link gerado pelo script scraper para ele. Ele fará o bypass de CORS e o chunking em tempo real.")
+    
+    st.code("""
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const targetUrl = url.searchParams.get("url");
+    if (!targetUrl) return new Response("URL ausente", { status: 400 });
+
+    const response = await fetch(targetUrl, { headers: request.headers });
+    const newResponse = new Response(response.body, response);
+    newResponse.headers.set("Access-Control-Allow-Origin", "*");
+    return newResponse;
+  }
+};
+    """, language="javascript")
