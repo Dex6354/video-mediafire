@@ -16,7 +16,7 @@ os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
 VIDEO_FILENAME = "video_local_player.mp4"
 SAVE_PATH = os.path.join(LOCAL_STATIC_DIR, VIDEO_FILENAME)
 
-# Inicializa variáveis de controle de estado
+# Inicializa variáveis de controle de estado do corte progressivo dinâmico
 if "processing" not in st.session_state:
     st.session_state.processing = False
 if "current_part" not in st.session_state:
@@ -27,8 +27,6 @@ if "base_duration" not in st.session_state:
     st.session_state.base_duration = 0.0
 if "total_duration" not in st.session_state:
     st.session_state.total_duration = 0.0
-if "last_auto_url" not in st.session_state:
-    st.session_state.last_auto_url = ""
 
 def get_mediafire_direct_link(url):
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -72,46 +70,35 @@ def clear_cache():
         if os.path.exists(f): os.remove(f)
     if os.path.exists(SAVE_PATH): os.remove(SAVE_PATH)
 
-def process_video_logic(url_to_process):
-    try:
-        clear_cache()
-        st.info("Obtendo link direto do MediaFire...")
-        link = get_mediafire_direct_link(url_to_process.strip())
-        
-        download_video_with_progress(link, SAVE_PATH)
-        
-        total_size = os.path.getsize(SAVE_PATH)
-        max_part_size = 900 * 1024 * 1024
-        st.session_state.num_parts = math.ceil(total_size / max_part_size)
-        
-        duration = get_video_duration(SAVE_PATH)
-        st.session_state.total_duration = duration
-        st.session_state.base_duration = (max_part_size / total_size) * duration if total_size > max_part_size else duration
-        
-        st.session_state.current_part = 1
-        st.session_state.processing = True
-        st.rerun()
-    except Exception as e:
-        st.error(f"Erro ao processar o vídeo: {e}")
+# Campo para colar a URL do Mediafire
+url_input = st.text_input("Cole a URL do MediaFire aqui:", placeholder="https://www.mediafire.com/file/...", disabled=st.session_state.processing)
 
-# Captura URL dos parâmetros da URL (?url=...)
-url_param = st.query_params.get("url", "")
-
-# Executa automaticamente se houver uma nova URL nos parâmetros
-if url_param and url_param != st.session_state.last_auto_url:
-    st.session_state.last_auto_url = url_param
-    process_video_logic(url_param)
-
-# Campo visual (mostra a URL atual se carregada via parâmetro)
-url_input = st.text_input("Cole a URL do MediaFire aqui:", value=url_param, placeholder="https://www.mediafire.com/file/...", disabled=st.session_state.processing)
-
-# Botão manual (caso queira processar outro link sem mudar a URL)
+# Botão único de processamento
 if st.button("📥 Processar Vídeo", use_container_width=True, disabled=st.session_state.processing):
     if not url_input.strip():
         st.error("Por favor, insira uma URL válida do MediaFire.")
     else:
-        st.session_state.last_auto_url = url_input.strip()
-        process_video_logic(url_input.strip())
+        try:
+            clear_cache()
+            st.info("Obtendo link direto do MediaFire...")
+            link = get_mediafire_direct_link(url_input.strip())
+            
+            download_video_with_progress(link, SAVE_PATH)
+            
+            # Limite de fragmentação
+            total_size = os.path.getsize(SAVE_PATH)
+            max_part_size = 900 * 1024 * 1024
+            st.session_state.num_parts = math.ceil(total_size / max_part_size)
+            
+            duration = get_video_duration(SAVE_PATH)
+            st.session_state.total_duration = duration
+            st.session_state.base_duration = (max_part_size / total_size) * duration if total_size > max_part_size else duration
+            
+            st.session_state.current_part = 1
+            st.session_state.processing = True
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao processar o vídeo: {e}")
 
 # Lógica de fatiamento sequencial dinâmico em background
 if st.session_state.processing:
@@ -200,7 +187,7 @@ if available_parts:
         st.info(f"🔄 Gerando próximas partes... ({len(available_parts)} de {st.session_state.num_parts} concluídas)")
 
 elif not st.session_state.processing:
-    st.info("Nenhum vídeo carregado no momento. Insira um link acima ou use o parâmetro ?url= na barra de endereço.")
+    st.info("Nenhum vídeo carregado no momento. Insira um link acima para iniciar.")
 
 # Botão de descarte
 if available_parts and not st.session_state.processing:
