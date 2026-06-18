@@ -83,7 +83,7 @@ with col1:
         
         # Cálculo de partes dinâmicas (Limite de 2GB)
         total_size = os.path.getsize(SAVE_PATH)
-        max_part_size = 2 * 1000 * 1000 * 1000  # 2 GB Comercial/Decimal
+        max_part_size = 1 * 1000 * 1000 * 1000  # 2 GB Comercial/Decimal
         st.session_state.num_parts = math.ceil(total_size / max_part_size)
         
         duration = get_video_duration(SAVE_PATH)
@@ -102,7 +102,7 @@ with col2:
         
         # Cálculo de partes dinâmicas (Limite de 2GB)
         total_size = os.path.getsize(SAVE_PATH)
-        max_part_size = 2 * 1000 * 1000 * 1000  # 2 GB Comercial/Decimal
+        max_part_size = 1 * 1000 * 1000 * 1000  # 2 GB Comercial/Decimal
         st.session_state.num_parts = math.ceil(total_size / max_part_size)
         
         duration = get_video_duration(SAVE_PATH)
