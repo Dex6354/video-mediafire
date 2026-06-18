@@ -2,17 +2,15 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(page_title="MediaFire Downloader & Player", page_icon="🎬", layout="centered")
 st.title("🎬 Baixar e Assistir Vídeos Grandes (6 GB+)")
 
-# Cria e garante a pasta static local no projeto (evita erro de permissão do venv)
-LOCAL_STATIC_DIR = "static"
-os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
-
+# Pasta simples para salvar o arquivo no disco do servidor
+LOCAL_DIR = "videos_temp"
+os.makedirs(LOCAL_DIR, exist_ok=True)
 VIDEO_FILENAME = "video_local_player.mp4"
-SAVE_PATH = os.path.join(LOCAL_STATIC_DIR, VIDEO_FILENAME)
+SAVE_PATH = os.path.join(LOCAL_DIR, VIDEO_FILENAME)
 
 # Links dos vídeos
 VIDEO_1_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
@@ -49,7 +47,7 @@ def download_video_with_progress(direct_link, output_path):
         else:
             total_length = int(total_length)
             bytes_baixados = 0
-            chunk_size = 4096 * 1024  # Blocos de 4MB (RAM protegida)
+            chunk_size = 4096 * 1024  # Blocos de 4MB (Protege a memória RAM)
 
             for chunk in video_response.iter_content(chunk_size=chunk_size):
                 if chunk:
@@ -61,11 +59,11 @@ def download_video_with_progress(direct_link, output_path):
                     gb_baixados = bytes_baixados / (1024 ** 3)
                     gb_totais = total_length / (1024 ** 3)
                     
-                    # Atualização em tempo real na tela
+                    # Atualização na tela
                     status_text.text(f"Progresso: {porcentagem}% ({gb_baixados:.2f} GB de {gb_totais:.2f} GB)")
                     progress_bar.progress(bytes_baixados / total_length)
 
-# Botões de seleção e download
+# Botões de seleção
 col1, col2 = st.columns(2)
 
 with col1:
@@ -92,29 +90,10 @@ with col2:
         except Exception as e:
             st.error(f"Erro: {e}")
 
-# Só renderiza o player se o arquivo já tiver sido totalmente baixado no disco
+# Exibe o player nativo apontando diretamente para o arquivo salvo no HD
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
-    st.subheader("🎬 Player Local (Executando do Disco sem carregar a RAM):")
+    st.subheader("🎬 Player de Vídeo (Executando direto do disco local):")
     
-    # Player de alta performance Plyr rodando o arquivo local da pasta static
-    video_html = f"""
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
-    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
-    
-    <div style="background-color: #000; padding: 5px; border-radius: 8px; overflow: hidden;">
-        <video id="player" playsinline controls preload="metadata" style="width: 100%; height: 400px;">
-            <source src="/static/{VIDEO_FILENAME}" type="video/mp4" />
-        </video>
-    </div>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {{
-            new Plyr('#player', {{
-                controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings', 'pip', 'fullscreen'],
-                ratio: '16:9'
-            }});
-        }});
-    </script>
-    """
-    components.html(video_html, height=430)
+    # Passando o caminho como string, o Streamlit faz o streaming streaming nativo do arquivo de 6GB sem travar
+    st.video(SAVE_PATH)
