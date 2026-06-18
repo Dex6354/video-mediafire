@@ -7,7 +7,7 @@ st.set_page_config(page_title="MediaFire Video Player", page_icon="🎬")
 st.title("🎬 Player de Vídeo - MediaFire")
 
 # URL fornecida
-VIDEO_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?dkey=y8d67l7c2pd&r=111"
+VIDEO_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
 SAVE_PATH = "temp_video.mp4"
 
 
