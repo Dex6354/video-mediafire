@@ -7,9 +7,9 @@ from bs4 import BeautifulSoup
 import streamlit as st
 
 st.set_page_config(page_title="MediaFire Dynamic Player", page_icon="🎬", layout="centered")
-st.title("🎬 Player Dinâmico (Vídeo em Partes de 400MB)")
+st.title("🎬 Player Dinâmico")
 
-st.warning("⚠️ **Aviso de Armazenamento:** Certifique-se de ter espaço em disco disponível para comportar os fragmentos gerados.")
+st.warning("⚠️ **Info:** 900mb por fragmento.")
 
 LOCAL_STATIC_DIR = "static"
 os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
