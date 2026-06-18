@@ -15,9 +15,9 @@ os.makedirs(LOCAL_DIR, exist_ok=True)
 VIDEO_FILENAME = "video_local_player.mp4"
 SAVE_PATH = os.path.join(LOCAL_DIR, VIDEO_FILENAME)
 
-# Porta exclusiva para o mini-servidor de streaming de vídeo
+# Servidor local para rodar o streaming por pedaços (Range Requests)
 VIDEO_SERVER_PORT = 8999
-VIDEO_STREAM_URL = f"http://localhost:{VIDEO_SERVER_PORT}/"
+VIDEO_STREAM_URL = f"http://127.0.0.1:{VIDEO_SERVER_PORT}/video.mp4"
 
 # Links dos vídeos
 VIDEO_1_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
@@ -25,9 +25,9 @@ VIDEO_2_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?d
 
 
 class VideoRangeRequestHandler(BaseHTTPRequestHandler):
-    """Servidor HTTP ultra-leve que suporta Range Requests (Streaming Real de arquivos gigantes)"""
+    """Servidor HTTP leve que suporta Range Requests para o player do navegador"""
     def log_message(self, format, *args):
-        pass  # Desativa logs no terminal para não poluir o console
+        pass  # Desativa logs no terminal
 
     def do_GET(self):
         if not os.path.exists(SAVE_PATH):
@@ -38,7 +38,6 @@ class VideoRangeRequestHandler(BaseHTTPRequestHandler):
         start, end = 0, size - 1
         status = 200
 
-        # Verifica se o navegador pediu apenas um pedaço (Range Request) do vídeo
         range_header = self.headers.get('Range')
         if range_header:
             match = re.search(r'bytes=(\d+)-(\d*)', range_header)
@@ -51,6 +50,7 @@ class VideoRangeRequestHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Accept-Ranges', 'bytes')
         self.send_header('Content-Type', 'video/mp4')
+        self.send_header('Access-Control-Allow-Origin', '*')  # Evita bloqueio de CORS
         
         if status == 206:
             self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
@@ -59,11 +59,10 @@ class VideoRangeRequestHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(size))
         self.end_headers()
 
-        # Transmite o bloco solicitado direto do HD sem carregar o resto na RAM
         with open(SAVE_PATH, 'rb') as f:
             f.seek(start)
             remaining = end - start + 1
-            chunk_size = 1024 * 1024  # 1MB por leitura de disco
+            chunk_size = 1024 * 1024  # 1MB por leitura
             while remaining > 0:
                 chunk = f.read(min(chunk_size, remaining))
                 if not chunk:
@@ -71,19 +70,19 @@ class VideoRangeRequestHandler(BaseHTTPRequestHandler):
                 try:
                     self.wfile.write(chunk)
                 except (ConnectionResetError, BrokenPipeError):
-                    break  # Usuário avançou o player ou fechou a aba
+                    break
                 remaining -= len(chunk)
 
 
 @st.cache_resource
 def iniciar_servidor_de_video():
-    """Inicia o servidor de streaming em segundo plano (roda apenas uma vez)"""
+    """Inicia o servidor de streaming em segundo plano"""
     server = ThreadingHTTPServer(('0.0.0.0', VIDEO_SERVER_PORT), VideoRangeRequestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return True
 
-# Garante que o servidor de vídeo está rodando de forma independente do fluxo do Streamlit
+# Inicializa o servidor independente
 iniciar_servidor_de_video()
 
 
@@ -119,7 +118,7 @@ def download_video_with_progress(direct_link, output_path):
         else:
             total_length = int(total_length)
             bytes_baixados = 0
-            chunk_size = 4096 * 1024  # Blocos de 4MB salvos direto no HD
+            chunk_size = 4096 * 1024  # 4MB direto no HD
 
             for chunk in video_response.iter_content(chunk_size=chunk_size):
                 if chunk:
@@ -162,11 +161,19 @@ with col2:
             st.error(f"Erro: {e}")
 
 
-# Renderização estável via URL externa local
+# Player de vídeo HTML5 Nativo injetado
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
-    st.subheader("🎬 Player Local via Stream Dedicado (Suporta avanço instatâneo):")
+    st.subheader("🎬 Player Local Dedicado (Suporta avanço instantâneo):")
     
-    # Passando a URL do nosso mini-servidor, o Streamlit apenas repassa o link de rede.
-    # Quem gerencia o arquivo de 6GB de forma eficiente é a Thread secundária pura do Python.
-    st.video(VIDEO_STREAM_URL)
+    st.markdown(
+        f"""
+        <div style="background-color: black; padding: 5px; border-radius: 8px;">
+            <video width="100%" height="auto" controls preload="metadata">
+                <source src="{VIDEO_STREAM_URL}" type="video/mp4">
+                Seu navegador não suporta HTML5 video.
+            </video>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
