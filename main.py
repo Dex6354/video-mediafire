@@ -58,13 +58,25 @@ def split_video_into_10_parts(input_path):
         
         status_split = st.empty()
         for i in range(10):
-            status_split.text(f"Cortando Parte {i+1} de 10...")
+            status_split.text(f"Cortando e estruturando Parte {i+1} de 10...")
             output_path = os.path.join(LOCAL_STATIC_DIR, f"part_{i+1}.mp4")
-            cmd = ["ffmpeg", "-y", "-ss", str(i * part_duration), "-i", input_path, "-t", str(part_duration), "-c", "copy", output_path]
+            
+            # -movflags +faststart: Move os metadados para o início do arquivo (essencial para web player)
+            # -avoid_negative_ts make_zero: Corrige os timestamps internos do fragmento cortado
+            cmd = [
+                "ffmpeg", "-y", 
+                "-ss", str(i * part_duration), 
+                "-i", input_path, 
+                "-t", str(part_duration), 
+                "-c", "copy", 
+                "-avoid_negative_ts", "make_zero",
+                "-movflags", "+faststart", 
+                output_path
+            ]
             subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         status_split.empty()
     except FileNotFoundError:
-        st.error("❌ O FFmpeg não foi encontrado no sistema. Certifique-se de ter adicionado o arquivo 'packages.txt' contendo 'ffmpeg' na raiz do seu repositório GitHub e reinicie o app.")
+        st.error("❌ O FFmpeg não foi encontrado no sistema. Certifique-se de ter adicionado o arquivo 'packages.txt' contendo 'ffmpeg' na raiz do seu repositório GitHub.")
         st.stop()
 
 parts_filenames = [f"part_{i}.mp4" for i in range(1, 11)]
