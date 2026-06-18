@@ -1,35 +1,54 @@
-import streamlit as st
-import time
+import os
 import requests
+from bs4 import BeautifulSoup
+import streamlit as st
 
-st.title("Teste de Velocidade de Internet")
+st.set_page_config(page_title="MediaFire Video Player", page_icon="🎬")
+st.title("🎬 Player de Vídeo - MediaFire")
 
-if st.button("Iniciar Teste"):
-    # Usando o endpoint estável da Cloudflare (aprox. 5MB)
-    url = "https://speed.cloudflare.com/__down?bytes=5000000"
-    
-    try:
-        st.write("Baixando arquivo de teste da Cloudflare...")
-        start_time = time.time()
-        
-        # Define um timeout de 15 segundos para evitar travamentos
-        response = requests.get(url, stream=True, timeout=15)
-        response.raise_for_status()
-        
-        total_size = 0
-        for chunk in response.iter_content(chunk_size=8192):
-            total_size += len(chunk)
-            
-        end_time = time.time()
-        duration = end_time - start_time
-        
-        # Cálculo: (bits baixados) / tempo / 1.000.000 = Mbps
-        speed_mbps = (total_size * 8) / (duration * 1_000_000)
-        
-        st.success(f"Velocidade estimada: **{speed_mbps:.2f} Mbps**")
-        st.caption(f"Baixados {total_size / (1024*1024):.2f} MB em {duration:.2f} segundos.")
-        
-    except requests.exceptions.ConnectionError:
-        st.error("Erro de conexão: A máquina virtual do Streamlit não conseguiu acessar o servidor. Se estiver usando o Streamlit Community Cloud, a plataforma pode estar bloqueando saídas de rede pesadas.")
-    except Exception as e:
-        st.error(f"Erro inesperado: {e}")
+# URL fornecida
+VIDEO_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?dkey=y8d67l7c2pd&r=111"
+SAVE_PATH = "temp_video.mp4"
+
+
+@st.cache_data(show_spinner=False)
+def download_mediafire_video(url, output_path):
+    """Extrai o link direto do MediaFire e baixa o vídeo."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+
+    # 1. Faz a requisição na página para extrair o link de download direto
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+    download_button = soup.find("a", id="downloadButton")
+
+    if not download_button:
+        raise Exception(
+            "Não foi possível encontrar o botão de download. O link pode ter expirado."
+        )
+
+    direct_link = download_button.get("href")
+
+    # 2. Faz o download do arquivo de vídeo
+    video_response = requests.get(direct_link, headers=headers, stream=True)
+    with open(output_path, "wb") as f:
+        for chunk in video_response.iter_content(chunk_size=1024 * 1024):
+            if chunk:
+                f.write(chunk)
+
+
+# Interface do Streamlit
+if st.button("Baixar e Carregar Vídeo"):
+    with st.spinner("Extraindo link e baixando o vídeo para o servidor..."):
+        try:
+            download_mediafire_video(VIDEO_URL, SAVE_PATH)
+            st.success("Download concluído com sucesso!")
+        except Exception as e:
+            st.error(f"Erro: {e}")
+
+# Exibe o player caso o arquivo já exista localmente
+if os.path.exists(SAVE_PATH):
+    st.markdown("---")
+    st.subheader("Visualização Online:")
+    st.video(SAVE_PATH)
