@@ -4,9 +4,9 @@ from bs4 import BeautifulSoup
 import streamlit as st
 
 st.set_page_config(page_title="MediaFire 6GB Ultra-Player", page_icon="🎬", layout="centered")
-st.title("🎬 Player Turbinado para Arquivos Gigantes (6 GB+)")
+st.title("🎬 Player Direto do Disco (Suporta 6 GB+)")
 
-# Pasta estática padrão do Streamlit
+# Garante a pasta estática local do Streamlit
 LOCAL_STATIC_DIR = "static"
 os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
 VIDEO_FILENAME = "video_local_player.mp4"
@@ -89,26 +89,20 @@ with col2:
         except Exception as e:
             st.error(f"Erro: {e}")
 
-# Player com rota absoluta e sem Iframe para máxima performance
+# Renderização direto no DOM principal usando st.markdown (Sem Iframes)
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
-    st.subheader("🎬 Player Local Robustecida (Executando direto do HD):")
+    st.subheader("🎬 Player Local (Renderizado na página principal):")
     
-    # Rota corrigida com '/app/static/' para o Streamlit mapear o arquivo de 6GB perfeitamente
-    ROTULO_ARQUIVO = f"/app/static/{VIDEO_FILENAME}"
-    
+    # O caminho relativo 'static/...' funciona perfeitamente aqui sem o bloqueio do iframe
     st.markdown(
         f"""
         <div style="background-color: black; padding: 10px; border-radius: 8px;">
-            <video width="100%" height="auto" controls preload="auto" style="max-height: 480px; width: 100%;">
-                <source src="{ROTULO_ARQUIVO}" type="video/mp4">
-                Seu navegador não suporta a reprodução de arquivos locais.
+            <video width="100%" height="auto" controls preload="auto" style="max-height: 480px;">
+                <source src="static/{VIDEO_FILENAME}" type="video/mp4">
+                Seu navegador não conseguiu renderizar o arquivo local da pasta static.
             </video>
         </div>
         """,
         unsafe_allow_html=True
     )
-    
-    # Rota de fuga caso o player do html sofra com falta de cache do navegador
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.link_button("📺 Abrir Vídeo em Tela Cheia (Nova Aba)", ROTULO_ARQUIVO, use_container_width=True)
