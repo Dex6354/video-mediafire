@@ -7,6 +7,8 @@ import streamlit as st
 st.set_page_config(page_title="MediaFire 10-Part Player", page_icon="🎬", layout="centered")
 st.title("🎬 Player Otimizado (1 Parte por Vez)")
 
+st.warning("⚠️ **Aviso do Streamlit Cloud:** Esta plataforma possui um limite estrito de ~1 GB de disco. Arquivos de 6 GB vão estourar o limite do container.")
+
 LOCAL_STATIC_DIR = "static"
 os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
 VIDEO_FILENAME = "video_local_player.mp4"
@@ -49,17 +51,21 @@ def download_video_with_progress(direct_link, output_path):
     status_text.empty()
 
 def split_video_into_10_parts(input_path):
-    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_path]
-    duration = float(subprocess.run(cmd, stdout=subprocess.PIPE, text=True).stdout.strip())
-    part_duration = duration / 10
-    
-    status_split = st.empty()
-    for i in range(10):
-        status_split.text(f"Cortando Parte {i+1} de 10...")
-        output_path = os.path.join(LOCAL_STATIC_DIR, f"part_{i+1}.mp4")
-        cmd = ["ffmpeg", "-y", "-ss", str(i * part_duration), "-i", input_path, "-t", str(part_duration), "-c", "copy", output_path]
-        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    status_split.empty()
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_path]
+        duration = float(subprocess.run(cmd, stdout=subprocess.PIPE, text=True).stdout.strip())
+        part_duration = duration / 10
+        
+        status_split = st.empty()
+        for i in range(10):
+            status_split.text(f"Cortando Parte {i+1} de 10...")
+            output_path = os.path.join(LOCAL_STATIC_DIR, f"part_{i+1}.mp4")
+            cmd = ["ffmpeg", "-y", "-ss", str(i * part_duration), "-i", input_path, "-t", str(part_duration), "-c", "copy", output_path]
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        status_split.empty()
+    except FileNotFoundError:
+        st.error("❌ O FFmpeg não foi encontrado no sistema. Certifique-se de ter adicionado o arquivo 'packages.txt' contendo 'ffmpeg' na raiz do seu repositório GitHub e reinicie o app.")
+        st.stop()
 
 parts_filenames = [f"part_{i}.mp4" for i in range(1, 11)]
 parts_exist = all(os.path.exists(os.path.join(LOCAL_STATIC_DIR, p)) for p in parts_filenames)
@@ -83,7 +89,6 @@ with col2:
         if os.path.exists(SAVE_PATH): os.remove(SAVE_PATH)
         st.rerun()
 
-# Renderização Isolada (Consumo de RAM controlado)
 if parts_exist:
     st.markdown("---")
     
@@ -93,7 +98,6 @@ if parts_exist:
         format_func=lambda x: f"▶️ Assistir Parte {x.split('_')[1].split('.')[0]}"
     )
     
-    # preload="none" garante isolamento total na memória do navegador até o clique do play
     st.markdown(
         f"""
         <div style="background-color: black; padding: 5px; border-radius: 8px;">
