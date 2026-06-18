@@ -5,13 +5,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="MediaFire Video Player", page_icon="🎬")
-st.title("🎬 Player de Vídeo - Suporte para Arquivos de 6 GB+")
+st.title("🎬 Player de Vídeo - Suporte para 6 GB+ com Progresso")
 
-# 1. Identifica a pasta estática interna do Streamlit
-STREAMLIT_STATIC_PATH = os.path.join(os.path.dirname(st.__file__), 'static')
+# Garante a criação da pasta static local no diretório do projeto (evita erro de permissão)
+LOCAL_STATIC_DIR = "static"
+os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
+
 VIDEO_FILENAME = "temp_large_video.mp4"
-SAVE_PATH = os.path.join(STREAMLIT_STATIC_PATH, VIDEO_FILENAME)
-
+SAVE_PATH = os.path.join(LOCAL_STATIC_DIR, VIDEO_FILENAME)
 VIDEO_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
 
 def download_mediafire_video(url, output_path):
@@ -19,7 +20,7 @@ def download_mediafire_video(url, output_path):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
 
-    # Extrai o link direto do MediaFire
+    # 1. Extrai o link direto
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, "html.parser")
     download_button = soup.find("a", id="downloadButton")
@@ -28,41 +29,59 @@ def download_mediafire_video(url, output_path):
         raise Exception("Botão de download não encontrado. O link pode ter expirado.")
 
     direct_link = download_button.get("href")
-
-    # Baixa o arquivo em blocos de 4MB salvando direto no HD (RAM limpa)
     video_response = requests.get(direct_link, headers=headers, stream=True)
     
     if "text/html" in video_response.headers.get("Content-Type", ""):
         raise Exception("O MediaFire bloqueou o download automatizado.")
 
+    total_length = video_response.headers.get('content-length')
+    
+    # Elementos visuais do progresso
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
     with open(output_path, "wb") as f:
-        for chunk in video_response.iter_content(chunk_size=4096 * 1024):
-            if chunk:
-                f.write(chunk)
+        if total_length is None:
+            f.write(video_response.content)
+        else:
+            total_length = int(total_length)
+            bytes_baixados = 0
+            chunk_size = 4096 * 1024  # Blocos de 4MB
 
-# Interface de Download
-if st.button("Baixar Vídeo de 6 GB no Servidor"):
-    with st.spinner("Baixando o arquivo para o disco do servidor... Como são 6 GB, isso vai levar alguns minutos."):
-        try:
-            if os.path.exists(SAVE_PATH):
-                os.remove(SAVE_PATH)
-            download_mediafire_video(VIDEO_URL, SAVE_PATH)
-            st.success("Vídeo baixado com sucesso no servidor!")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro: {e}")
+            for chunk in video_response.iter_content(chunk_size=chunk_size):
+                if chunk:
+                    f.write(chunk)
+                    bytes_baixados += len(chunk)
+                    
+                    # Cálculos de progresso
+                    porcentagem = int((bytes_baixados / total_length) * 100)
+                    gb_baixados = bytes_baixados / (1024 ** 3)
+                    gb_totais = total_length / (1024 ** 3)
+                    
+                    # Atualiza a interface em tempo real
+                    progress_bar.progress(bytes_baixados / total_length)
+                    status_text.text(f"Baixando: {porcentagem}% ({gb_baixados:.2f} GB de {gb_totais:.2f} GB)")
 
-# 2. Renderiza o player usando HTML5 puro conectado à rota estática do Streamlit
+# Interface
+if st.button("Iniciar Download do Vídeo"):
+    try:
+        if os.path.exists(SAVE_PATH):
+            os.remove(SAVE_PATH)
+        download_mediafire_video(VIDEO_URL, SAVE_PATH)
+        st.success("Download concluído com sucesso!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Erro: {e}")
+
+# Exibe o player apontando para a rota estática local
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
-    st.subheader("Visualização Online (Streaming ativo por demanda):")
+    st.subheader("Visualização Online:")
     
-    # O uso da barra '/' antes de static garante que o navegador busque a raiz do servidor Streamlit
     video_html = f"""
     <video width="100%" height="100%" controls preload="metadata">
         <source src="/static/{VIDEO_FILENAME}" type="video/mp4">
         Seu navegador não suporta o player de vídeo HTML5.
     </video>
     """
-    # Renderiza o player em uma camada HTML isolada e leve
     components.html(video_html, height=500)
