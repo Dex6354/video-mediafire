@@ -5,9 +5,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="MediaFire Video Player", page_icon="🎬")
-st.title("🎬 Player de Vídeo - Suporte para 6 GB+ com Progresso")
+st.title("🎬 Player de Vídeo - Suporte para 6 GB+ (GitHub Ready)")
 
-# Garante a criação da pasta static local no diretório do projeto (evita erro de permissão)
+# Cria a pasta static local no ambiente de hospedagem se ela não existir
 LOCAL_STATIC_DIR = "static"
 os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
 
@@ -36,7 +36,7 @@ def download_mediafire_video(url, output_path):
 
     total_length = video_response.headers.get('content-length')
     
-    # Elementos visuais do progresso
+    # Elementos visuais do progresso no Streamlit
     progress_bar = st.progress(0)
     status_text = st.empty()
 
@@ -46,7 +46,7 @@ def download_mediafire_video(url, output_path):
         else:
             total_length = int(total_length)
             bytes_baixados = 0
-            chunk_size = 4096 * 1024  # Blocos de 4MB
+            chunk_size = 4096 * 1024  # Blocos de 4MB para poupar RAM
 
             for chunk in video_response.iter_content(chunk_size=chunk_size):
                 if chunk:
@@ -58,22 +58,21 @@ def download_mediafire_video(url, output_path):
                     gb_baixados = bytes_baixados / (1024 ** 3)
                     gb_totais = total_length / (1024 ** 3)
                     
-                    # Atualiza a interface em tempo real
-                    progress_bar.progress(bytes_baixados / total_length)
                     status_text.text(f"Baixando: {porcentagem}% ({gb_baixados:.2f} GB de {gb_totais:.2f} GB)")
+                    progress_bar.progress(bytes_baixados / total_length)
 
-# Interface
+# Interface de usuário
 if st.button("Iniciar Download do Vídeo"):
     try:
         if os.path.exists(SAVE_PATH):
             os.remove(SAVE_PATH)
         download_mediafire_video(VIDEO_URL, SAVE_PATH)
-        st.success("Download concluído com sucesso!")
+        st.success("Download concluído com sucesso no servidor!")
         st.rerun()
     except Exception as e:
         st.error(f"Erro: {e}")
 
-# Exibe o player apontando para a rota estática local
+# Exibe o player usando HTML5 nativo integrado à rota estática
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
     st.subheader("Visualização Online:")
