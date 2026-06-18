@@ -6,8 +6,7 @@ from bs4 import BeautifulSoup
 st.set_page_config(page_title="MediaFire Video Player", page_icon="🎬")
 st.title("🎬 Player de Vídeo - MediaFire")
 
-# Link atualizado conforme solicitado
-VIDEO_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
+VIDEO_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?dkey=y8d67l7c2pd&r=111"
 SAVE_PATH = "temp_video.mp4"
 
 def download_mediafire_video(url, output_path):
@@ -28,7 +27,7 @@ def download_mediafire_video(url, output_path):
     # 2. Baixa o vídeo em blocos (stream)
     video_response = requests.get(direct_link, headers=headers, stream=True)
     
-    # Validação contra bloqueios do MediaFire
+    # Validação: Se o tipo do conteúdo for HTML, o MediaFire bloqueou o download
     if "text/html" in video_response.headers.get("Content-Type", ""):
         raise Exception("O MediaFire retornou uma página de erro (Captcha/Bloqueio) em vez do arquivo de vídeo.")
 
@@ -48,15 +47,16 @@ if st.button("Baixar e Carregar Vídeo"):
                 
             download_mediafire_video(VIDEO_URL, SAVE_PATH)
             st.success("Download concluído com sucesso!")
-            st.rerun() 
+            st.rerun() # Recarrega a página para atualizar o player de forma limpa
         except Exception as e:
             st.error(f"Erro: {e}")
 
-# Exibe o player se o arquivo existir
+# Exibe o player se o arquivo existir e for válido
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
     st.subheader("Visualização Online:")
     try:
+        # Abre o arquivo em modo binário de leitura para o Streamlit processar com segurança
         with open(SAVE_PATH, "rb") as video_file:
             st.video(video_file)
     except Exception as e:
