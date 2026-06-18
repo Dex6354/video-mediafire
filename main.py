@@ -1,77 +1,93 @@
+import os
+import requests
+from bs4 import BeautifulSoup
 import streamlit as st
 
-st.set_page_config(page_title="MediaFire Player Nuvem", page_icon="🎬", layout="centered")
-st.title("🎬 Player Web MediaFire Sem Download Local")
+st.set_page_config(page_title="MediaFire Local Player", page_icon="🎬", layout="centered")
+st.title("🎬 Player Local para Arquivos Grandes (6 GB+)")
 
-# Links originais públicos do MediaFire
+# Arquivo temporário salvo no seu HD (RAM estática próxima a 0MB)
+SAVE_PATH = "video_local_cache.mp4"
+
 VIDEO_1_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file"
 VIDEO_2_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file"
 
-st.markdown("---")
-st.subheader("Selecione o vídeo para assistir direto no navegador:")
+def get_mediafire_direct_link(url):
+    """Extrai a URL direta de download do MediaFire."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    response = requests.get(url, headers=headers, timeout=10)
+    soup = BeautifulSoup(response.text, "html.parser")
+    download_button = soup.find("a", id="downloadButton")
+    if download_button:
+        return download_button.get("href")
+    raise Exception("Não foi possível encontrar o botão de download.")
 
-video_opcao = st.radio(
-    "Escolha o arquivo:",
-    ("Vídeo 1 (Sample - 5MB)", "Vídeo 2 (TEVEO 1 - 6GB)")
-)
-
-url_selecionada = VIDEO_1_URL if "5MB" in video_opcao else VIDEO_2_URL
-
-# Injeta um player sandboxed onde o processamento do link e do streaming 
-# acontece integralmente no lado do cliente (navegador do usuário).
-# Consumo no Streamlit Cloud: 0% de RAM e 0% de Disco.
-st.components.v1.html(
-    f"""
-    <div style="background-color: #111; padding: 20px; border-radius: 8px; text-align: center; font-family: sans-serif; color: white;">
-        <h4 style="margin-top: 0;">Carregando Engine de Streaming do Cliente...</h4>
-        <p style="font-size: 13px; color: #aaa;">O navegador vai ler o arquivo de 6GB por demanda direto do MediaFire.</p>
+def download_video_em_pedacos(url, save_path):
+    """Baixa o arquivo escrevendo direto no HD em blocos de 1MB (RAM sob controle)."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+    # stream=True impede que o Python jogue o arquivo de 6GB na memória RAM
+    with requests.get(url, headers=headers, stream=True, timeout=30) as r:
+        r.raise_for_status()
+        total_size = int(r.headers.get('content-length', 0))
         
-        <div id="player-container" style="margin-top: 15px;">
-            <video id="videoPlayer" width="100%" height="360" controls preload="metadata" style="border-radius: 4px; background: black;">
-                <source src="" type="video/mp4">
-                Seu navegador não suporta streaming direto.
-            </video>
-        </div>
+        progresso_barra = st.progress(0)
+        status_texto = st.empty()
+        bytes_baixados = 0
         
-        <div style="margin-top: 15px;">
-            <a href="{url_selecionada}" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;">
-                🔗 Abrir na Aba Nativa do Navegador (Fallback)
-            </a>
-        </div>
-    </div>
-
-    <script>
-        // Executado no contexto do usuário (contorna o bloqueio de IP do servidor)
-        async function resolverEPlay() {{
-            const videoUrl = "{url_selecionada}";
-            const player = document.getElementById('videoPlayer');
-            
-            try {{
-                // Faz a requisição simulando o navegador para pegar o downloadButton
-                const response = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(videoUrl));
-                const data = await response.json();
-                
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(data.contents, 'text/html');
-                const downloadBtn = doc.querySelector('#downloadButton');
-                
-                if (downloadBtn) {{
-                    const directLink = downloadBtn.getAttribute('href');
-                    player.src = directLink;
-                    player.load();
-                }} else {{
-                    console.log("Link direto não encontrado na árvore DOM.");
-                }}
-            }} catch (e) {{
-                console.error("Erro na resolução client-side:", e);
-            }}
-        }}
+        with open(save_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024 * 1024): # 1 MB por vez
+                if chunk:
+                    f.write(chunk)
+                    bytes_baixados += len(chunk)
+                    if total_size > 0:
+                        percentual = min(int((bytes_baixados / total_size) * 100), 100)
+                        progresso_barra.progress(percentual / 100)
+                        status_texto.text(f"📥 Baixando para o HD: {bytes_baixados // (1024*1024)} MB / {total_size // (1024*1024)} MB")
         
-        // Inicializa a tentativa de bypass assim que o componente renderiza
-        resolverEPlay();
-    </script>
-    """,
-    height=520
-)
+        progresso_barra.empty()
+        status_texto.empty()
 
-st.info("💡 **Nota:** Arquivos de 6GB exigem uma conexão estável. Se o player integrado travar por restrições de segurança do MediaFire na sua rede, clique no botão azul para assistir na aba nativa do navegador.")
+# Layout do App
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("📥 Baixar Vídeo 1 (5MB)", use_container_width=True):
+        try:
+            if os.path.exists(SAVE_PATH): os.remove(SAVE_PATH)
+            with st.spinner("Buscando link..."):
+                link = get_mediafire_direct_link(VIDEO_1_URL)
+            download_video_em_pedacos(link, SAVE_PATH)
+            st.success("Vídeo 1 pronto para reprodução!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro: {e}")
+
+with col2:
+    if st.button("📥 Baixar Vídeo 2 (6GB)", use_container_width=True):
+        try:
+            if os.path.exists(SAVE_PATH): os.remove(SAVE_PATH)
+            with st.spinner("Buscando link..."):
+                link = get_mediafire_direct_link(VIDEO_2_URL)
+            download_video_em_pedacos(link, SAVE_PATH)
+            st.success("Vídeo de 6GB armazenado no HD com sucesso!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro: {e}")
+
+# Renderização do Player de Vídeo
+if os.path.exists(SAVE_PATH):
+    st.markdown("---")
+    st.subheader("🎬 Player Local Inabalável")
+    st.caption("O servidor lê o arquivo do HD por demanda. Avançar o vídeo funciona sem carregar tudo na RAM.")
+    
+    # Passando a string do caminho do arquivo, o Streamlit ativa 
+    # nativamente o suporte a Range Requests (Streaming local por partes)
+    st.video(SAVE_PATH)
+    
+    if st.button("🗑️ Limpar Cache / Deletar Vídeo do HD"):
+        os.remove(SAVE_PATH)
+        st.rerun()
