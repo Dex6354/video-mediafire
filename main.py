@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import streamlit as st
 
 st.set_page_config(page_title="MediaFire 10-Part Player", page_icon="🎬", layout="centered")
-st.title("🎬 Player Progressivo (Parte por Vez)")
+st.title("🎬 Player Otimizado (1 Player por Vez)")
 
 st.warning("⚠️ **Aviso de Armazenamento:** Certifique-se de ter espaço em disco disponível para comportar os fragmentos gerados.")
 
@@ -106,7 +106,6 @@ if st.session_state.processing:
         start_time = (i - 1) * st.session_state.part_duration
         output_path = os.path.join(LOCAL_STATIC_DIR, f"part_{i}.mp4")
         
-        # Parâmetros calibrados para compatibilidade e streaming imediato via navegador
         cmd = [
             "ffmpeg", "-y",
             "-ss", str(start_time),
@@ -120,35 +119,43 @@ if st.session_state.processing:
         subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         status_split.empty()
         
-        # Atualiza o contador e recarrega a página para exibir o novo player gerado
         st.session_state.current_part += 1
         st.rerun()
     else:
-        # Fim do processamento: descarta o vídeo bruto de 6GB mantendo apenas as partes leves
         st.session_state.processing = False
         if os.path.exists(SAVE_PATH): 
             os.remove(SAVE_PATH)
         st.success("🎉 Todas as partes prontas!")
         st.rerun()
 
-# Seção de exibição em tempo real
+# Seção de exibição isolada (Apenas 1 player ativo na tela por vez)
 st.markdown("---")
-st.subheader("🎬 Reprodutores de Vídeo Disponíveis")
+st.subheader("🎬 Visualizador de Partes")
 
-parts_found = False
-for i in range(1, 11):
-    part_path = os.path.join(LOCAL_STATIC_DIR, f"part_{i}.mp4")
-    if os.path.exists(part_path):
-        parts_found = True
-        # Abre expanders automáticos para organizar a tela sem gargalos de reprodução
-        with st.expander(f"▶️ Assistir Fragmento {i}", expanded=(i == st.session_state.current_part - 1)):
-            st.video(part_path)
+# Escaneia quais partes já estão fisicamente prontas no HD
+available_parts = [f"part_{x}.mp4" for x in range(1, 11) if os.path.exists(os.path.join(LOCAL_STATIC_DIR, f"part_{x}.mp4"))]
 
-if not parts_found and not st.session_state.processing:
+if available_parts:
+    # Cria uma caixa de seleção para o usuário escolher apenas UMA parte
+    selected_part = st.selectbox(
+        "Selecione qual parte deseja reproduzir:",
+        options=available_parts,
+        index=len(available_parts) - 1, # Foca automaticamente na última parte criada
+        format_func=lambda x: f"▶️ Assistir Fragmento {x.split('_')[1].split('.')[0]}"
+    )
+    
+    # Renderiza unicamente o player selecionado, poupando a memória do Streamlit
+    part_path = os.path.join(LOCAL_STATIC_DIR, selected_part)
+    st.video(part_path)
+    
+    if st.session_state.processing:
+        st.info("🔄 O sistema continua gerando as próximas partes em segundo plano...")
+
+elif not st.session_state.processing:
     st.info("Nenhum vídeo carregado no momento. Use as opções acima para iniciar.")
 
 # Botão de descarte
-if parts_found and not st.session_state.processing:
+if available_parts and not st.session_state.processing:
     if st.button("🗑️ Deletar todos os arquivos salvos"):
         for i in range(1, 11):
             p_path = os.path.join(LOCAL_STATIC_DIR, f"part_{i}.mp4")
