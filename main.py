@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import streamlit as st
 
 st.set_page_config(page_title="MediaFire Dynamic Player", page_icon="🎬", layout="centered")
-st.title("🎬 Player Dinâmico (Vídeo em Partes de 1GB)")
+st.title("🎬 Player Dinâmico (Vídeo em Partes de 400MB)")
 
 st.warning("⚠️ **Aviso de Armazenamento:** Certifique-se de ter espaço em disco disponível para comportar os fragmentos gerados.")
 
@@ -85,9 +85,9 @@ if st.button("📥 Processar Vídeo", use_container_width=True, disabled=st.sess
             
             download_video_with_progress(link, SAVE_PATH)
             
-            # Cálculo de partes dinâmicas (Limite estrito de 1GB)
+            # Limite estrito de 400MB para total estabilidade do streaming
             total_size = os.path.getsize(SAVE_PATH)
-            max_part_size = 1 * 1000 * 1000 * 1000  # 1 GB
+            max_part_size = 900 * 1024 * 1024  # 400 MB reais
             st.session_state.num_parts = math.ceil(total_size / max_part_size)
             
             duration = get_video_duration(SAVE_PATH)
