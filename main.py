@@ -1,46 +1,68 @@
-import streamlit as st
+import os
 import requests
 from bs4 import BeautifulSoup
+import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="MediaFire Video Player", page_icon="🎬")
-st.title("🎬 Player de Vídeo - MediaFire (Suporte a 6 GB+)")
+st.title("🎬 Player de Vídeo - Suporte para Arquivos de 6 GB+")
 
-# Link do vídeo
-VIDEO_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?dkey=8j4nv0uf9vh&r=557"
+# 1. Identifica a pasta estática interna do Streamlit
+STREAMLIT_STATIC_PATH = os.path.join(os.path.dirname(st.__file__), 'static')
+VIDEO_FILENAME = "temp_large_video.mp4"
+SAVE_PATH = os.path.join(STREAMLIT_STATIC_PATH, VIDEO_FILENAME)
 
-def get_mediafire_direct_link(url):
-    """Extrai apenas a URL direta de download do MediaFire sem baixar o arquivo."""
+VIDEO_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
+
+def download_mediafire_video(url, output_path):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
-    
+
+    # Extrai o link direto do MediaFire
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, "html.parser")
     download_button = soup.find("a", id="downloadButton")
 
     if not download_button:
-        raise Exception("Não foi possível encontrar o botão de download. O link pode ter expirado.")
+        raise Exception("Botão de download não encontrado. O link pode ter expirado.")
 
-    return download_button.get("href")
+    direct_link = download_button.get("href")
 
-# Botão para carregar o player
-if st.button("Carregar Vídeo para o Player"):
-    with st.spinner("Obtendo link de streaming direto do MediaFire..."):
+    # Baixa o arquivo em blocos de 4MB salvando direto no HD (RAM limpa)
+    video_response = requests.get(direct_link, headers=headers, stream=True)
+    
+    if "text/html" in video_response.headers.get("Content-Type", ""):
+        raise Exception("O MediaFire bloqueou o download automatizado.")
+
+    with open(output_path, "wb") as f:
+        for chunk in video_response.iter_content(chunk_size=4096 * 1024):
+            if chunk:
+                f.write(chunk)
+
+# Interface de Download
+if st.button("Baixar Vídeo de 6 GB no Servidor"):
+    with st.spinner("Baixando o arquivo para o disco do servidor... Como são 6 GB, isso vai levar alguns minutos."):
         try:
-            # Obtém o link direto (URL final do arquivo .mp4)
-            direct_link = get_mediafire_direct_link(VIDEO_URL)
-            # Salva no estado da sessão para não perder ao renderizar o vídeo
-            st.session_state["video_direct_link"] = direct_link
-            st.success("Link de streaming gerado com sucesso!")
+            if os.path.exists(SAVE_PATH):
+                os.remove(SAVE_PATH)
+            download_mediafire_video(VIDEO_URL, SAVE_PATH)
+            st.success("Vídeo baixado com sucesso no servidor!")
+            st.rerun()
         except Exception as e:
             st.error(f"Erro: {e}")
 
-# Exibe o player utilizando o link direto gerado
-if "video_direct_link" in st.session_state:
+# 2. Renderiza o player usando HTML5 puro conectado à rota estática do Streamlit
+if os.path.exists(SAVE_PATH):
     st.markdown("---")
-    st.subheader("Visualização Online:")
-    try:
-        # O navegador faz o streaming direto da nuvem do MediaFire, evitando crash de RAM de 6GB
-        st.video(st.session_state["video_direct_link"])
-    except Exception as e:
-        st.error(f"Erro ao renderizar o player: {e}")
+    st.subheader("Visualização Online (Streaming ativo por demanda):")
+    
+    # O uso da barra '/' antes de static garante que o navegador busque a raiz do servidor Streamlit
+    video_html = f"""
+    <video width="100%" height="100%" controls preload="metadata">
+        <source src="/static/{VIDEO_FILENAME}" type="video/mp4">
+        Seu navegador não suporta o player de vídeo HTML5.
+    </video>
+    """
+    # Renderiza o player em uma camada HTML isolada e leve
+    components.html(video_html, height=500)
