@@ -90,7 +90,7 @@ if st.button("📥 Processar Vídeo", use_container_width=True, disabled=st.sess
             
             # Limite estrito de 400MB para total estabilidade do streaming
             total_size = os.path.getsize(SAVE_PATH)
-            max_part_size = 400 * 1024 * 1024  
+            max_part_size = 900 * 1024 * 1024  
             st.session_state.num_parts = math.ceil(total_size / max_part_size)
             
             duration = get_video_duration(SAVE_PATH)
