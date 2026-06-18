@@ -4,9 +4,9 @@ import requests
 from bs4 import BeautifulSoup
 
 st.set_page_config(page_title="MediaFire Video Player", page_icon="🎬")
-st.title("🎬 Player de Vídeo - MediaFire")
+st.title("🎬 Player de Vídeo - MediaFire (Suporte a Arquivos Grandes)")
 
-VIDEO_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?dkey=y8d67l7c2pd&r=111"
+VIDEO_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
 SAVE_PATH = "temp_video.mp4"
 
 def download_mediafire_video(url, output_path):
@@ -20,44 +20,41 @@ def download_mediafire_video(url, output_path):
     download_button = soup.find("a", id="downloadButton")
 
     if not download_button:
-        raise Exception("Não foi possível encontrar o botão de download. O link pode ter expirado ou o MediaFire bloqueou o acesso.")
+        raise Exception("Não foi possível encontrar o botão de download. O link pode ter expirado.")
 
     direct_link = download_button.get("href")
 
-    # 2. Baixa o vídeo em blocos (stream)
+    # 2. Baixa o vídeo em blocos direto para o disco (sem carregar na RAM)
     video_response = requests.get(direct_link, headers=headers, stream=True)
     
-    # Validação: Se o tipo do conteúdo for HTML, o MediaFire bloqueou o download
     if "text/html" in video_response.headers.get("Content-Type", ""):
-        raise Exception("O MediaFire retornou uma página de erro (Captcha/Bloqueio) em vez do arquivo de vídeo.")
+        raise Exception("O MediaFire bloqueou o download automático deste arquivo.")
 
-    # Salva o arquivo no disco
+    # Salva em blocos de 4MB para manter o uso de RAM baixo
     with open(output_path, "wb") as f:
-        for chunk in video_response.iter_content(chunk_size=1024 * 1024):
+        for chunk in video_response.iter_content(chunk_size=4096 * 1024):
             if chunk:
                 f.write(chunk)
 
 # Botão para iniciar o download
 if st.button("Baixar e Carregar Vídeo"):
-    with st.spinner("Fazendo download do vídeo..."):
+    with st.spinner("Baixando o vídeo para o servidor... Como o arquivo é grande, isso vai levar um tempo."):
         try:
-            # Remove arquivo antigo para evitar conflitos
             if os.path.exists(SAVE_PATH):
                 os.remove(SAVE_PATH)
                 
             download_mediafire_video(VIDEO_URL, SAVE_PATH)
-            st.success("Download concluído com sucesso!")
-            st.rerun() # Recarrega a página para atualizar o player de forma limpa
+            st.success("Download concluído com sucesso no servidor!")
+            st.rerun() 
         except Exception as e:
             st.error(f"Erro: {e}")
 
-# Exibe o player se o arquivo existir e for válido
+# EXIBIÇÃO CORRIGIDA: Passa a string do caminho. O Streamlit faz o streaming direto do HD.
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
     st.subheader("Visualização Online:")
     try:
-        # Abre o arquivo em modo binário de leitura para o Streamlit processar com segurança
-        with open(SAVE_PATH, "rb") as video_file:
-            st.video(video_file)
+        # Passando apenas o caminho (SAVE_PATH) em vez de abrir o arquivo evita o estouro de RAM
+        st.video(SAVE_PATH)
     except Exception as e:
         st.error(f"Erro ao renderizar o player de vídeo: {e}")
