@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import streamlit as st
 
 st.set_page_config(page_title="MediaFire Dynamic Player", page_icon="🎬", layout="centered")
-st.title("🎬 Player Dinâmico (Máximo 2GB por Parte)")
+st.title("🎬 Player Dinâmico (Vídeo em Partes de 1GB)")
 
 st.warning("⚠️ **Aviso de Armazenamento:** Certifique-se de ter espaço em disco disponível para comportar os fragmentos gerados.")
 
@@ -15,9 +15,6 @@ LOCAL_STATIC_DIR = "static"
 os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
 VIDEO_FILENAME = "video_local_player.mp4"
 SAVE_PATH = os.path.join(LOCAL_STATIC_DIR, VIDEO_FILENAME)
-
-VIDEO_1_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
-VIDEO_2_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?dkey=8j4nv0uf9vh&r=557"
 
 # Inicializa variáveis de controle de estado do corte progressivo dinâmico
 if "processing" not in st.session_state:
@@ -37,7 +34,7 @@ def get_mediafire_direct_link(url):
     soup = BeautifulSoup(response.text, "html.parser")
     download_button = soup.find("a", id="downloadButton")
     if not download_button:
-        raise Exception("Link expirado ou inválido.")
+        raise Exception("Link expirado, inválido ou não encontrou o botão de download.")
     return download_button.get("href")
 
 def download_video_with_progress(direct_link, output_path):
@@ -73,45 +70,35 @@ def clear_cache():
         if os.path.exists(f): os.remove(f)
     if os.path.exists(SAVE_PATH): os.remove(SAVE_PATH)
 
-# Botões de ação principais
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("📥 Processar Vídeo 1 (Sample)", use_container_width=True, disabled=st.session_state.processing):
-        clear_cache()
-        link = get_mediafire_direct_link(VIDEO_1_URL)
-        download_video_with_progress(link, SAVE_PATH)
-        
-        # Cálculo de partes dinâmicas (Limite de 2GB)
-        total_size = os.path.getsize(SAVE_PATH)
-        max_part_size = 1 * 1000 * 1000 * 1000  # 2 GB Comercial/Decimal
-        st.session_state.num_parts = math.ceil(total_size / max_part_size)
-        
-        duration = get_video_duration(SAVE_PATH)
-        st.session_state.total_duration = duration
-        st.session_state.base_duration = (max_part_size / total_size) * duration if total_size > max_part_size else duration
-        
-        st.session_state.current_part = 1
-        st.session_state.processing = True
-        st.rerun()
+# Campo para colar a URL do Mediafire
+url_input = st.text_input("Cole a URL do MediaFire aqui:", placeholder="https://www.mediafire.com/file/...", disabled=st.session_state.processing)
 
-with col2:
-    if st.button("📥 Processar Vídeo 2 (6GB)", use_container_width=True, disabled=st.session_state.processing):
-        clear_cache()
-        link = get_mediafire_direct_link(VIDEO_2_URL)
-        download_video_with_progress(link, SAVE_PATH)
-        
-        # Cálculo de partes dinâmicas (Limite de 2GB)
-        total_size = os.path.getsize(SAVE_PATH)
-        max_part_size = 1 * 1000 * 1000 * 1000  # 2 GB Comercial/Decimal
-        st.session_state.num_parts = math.ceil(total_size / max_part_size)
-        
-        duration = get_video_duration(SAVE_PATH)
-        st.session_state.total_duration = duration
-        st.session_state.base_duration = (max_part_size / total_size) * duration if total_size > max_part_size else duration
-        
-        st.session_state.current_part = 1
-        st.session_state.processing = True
-        st.rerun()
+# Botão único de processamento
+if st.button("📥 Processar Vídeo", use_container_width=True, disabled=st.session_state.processing):
+    if not url_input.strip():
+        st.error("Por favor, insira uma URL válida do MediaFire.")
+    else:
+        try:
+            clear_cache()
+            st.info("Obtendo link direto do MediaFire...")
+            link = get_mediafire_direct_link(url_input.strip())
+            
+            download_video_with_progress(link, SAVE_PATH)
+            
+            # Cálculo de partes dinâmicas (Limite estrito de 1GB)
+            total_size = os.path.getsize(SAVE_PATH)
+            max_part_size = 1 * 1000 * 1000 * 1000  # 1 GB
+            st.session_state.num_parts = math.ceil(total_size / max_part_size)
+            
+            duration = get_video_duration(SAVE_PATH)
+            st.session_state.total_duration = duration
+            st.session_state.base_duration = (max_part_size / total_size) * duration if total_size > max_part_size else duration
+            
+            st.session_state.current_part = 1
+            st.session_state.processing = True
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao processar o vídeo: {e}")
 
 # Lógica de fatiamento sequencial dinâmico em background
 if st.session_state.processing:
@@ -122,7 +109,6 @@ if st.session_state.processing:
         
         start_time = (i - 1) * st.session_state.base_duration
         
-        # Se for a última parte, garante pegar o tempo restante exato do arquivo
         if i == st.session_state.num_parts:
             duration_to_cut = st.session_state.total_duration - start_time
         else:
@@ -152,11 +138,10 @@ if st.session_state.processing:
         st.success("🎉 Todas as partes dinâmicas prontas!")
         st.rerun()
 
-# Seção de exibição isolada (Mapeamento dinâmico da pasta static)
+# Seção de exibição isolada
 st.markdown("---")
 st.subheader("🎬 Visualizador de Partes")
 
-# Varre o diretório para encontrar as partes reais salvas no disco
 available_parts = [os.path.basename(f) for f in glob.glob(os.path.join(LOCAL_STATIC_DIR, "part_*.mp4"))]
 available_parts.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
@@ -164,7 +149,7 @@ if available_parts:
     selected_part = st.selectbox(
         "Selecione qual parte deseja reproduzir:",
         options=available_parts,
-        index=len(available_parts) - 1, # Foca no fragmento mais recente gerado
+        index=len(available_parts) - 1,
         format_func=lambda x: f"▶️ Assistir Fragmento {x.split('_')[1].split('.')[0]}"
     )
     
@@ -175,7 +160,7 @@ if available_parts:
         st.info(f"🔄 Gerando próximas partes... ({len(available_parts)} de {st.session_state.num_parts} concluídas)")
 
 elif not st.session_state.processing:
-    st.info("Nenhum vídeo carregado no momento. Use as opções acima para iniciar.")
+    st.info("Nenhum vídeo carregado no momento. Insira um link acima para iniciar.")
 
 # Botão de descarte
 if available_parts and not st.session_state.processing:
