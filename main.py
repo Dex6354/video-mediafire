@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 st.set_page_config(page_title="MediaFire Video Player", page_icon="🎬")
 st.title("🎬 Player de Vídeo - MediaFire (Suporte a Arquivos Grandes)")
 
-VIDEO_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
+VIDEO_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file?dkey=8j4nv0uf9vh&r=557"
 SAVE_PATH = "temp_video.mp4"
 
 def download_mediafire_video(url, output_path):
