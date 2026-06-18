@@ -3,8 +3,8 @@ import requests
 from bs4 import BeautifulSoup
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="MediaFire Multi-Stream", page_icon="🎬")
-st.title("🎬 Player de Streaming Direto (Video.js Avançado)")
+st.set_page_config(page_title="MediaFire Ultra-Stream", page_icon="🎬", layout="centered")
+st.title("🎬 Player de Streaming Comercial (Plyr)")
 
 # Links dos vídeos
 VIDEO_1_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
@@ -24,7 +24,7 @@ def get_mediafire_direct_link(url):
 
     return download_button.get("href")
 
-# Duas colunas para os botões
+# Seleção de vídeos
 col1, col2 = st.columns(2)
 
 with col1:
@@ -45,28 +45,35 @@ with col2:
             except Exception as e:
                 st.error(f"Erro no Vídeo 2: {e}")
 
-# Exibe o player robusto caso um link tenha sido gerado
+# Renderização do Player de Alta Performance
 if "stream_link" in st.session_state:
     st.markdown("---")
     st.subheader(f"Reproduzindo: {st.session_state['video_atual']}")
     
-    # Player HTML injetando a biblioteca Video.js para alta performance com arquivos grandes
+    # Player Plyr via CDN com tratamento de buffer aprimorado
     video_html = f"""
-    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
-    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
     
-    <div style="background-color: black; padding: 10px; display: flex; justify-content: center; align-items: center;">
-        <video 
-            id="media-player" 
-            class="video-js vjs-default-skin vjs-big-play-centered" 
-            controls 
-            preload="metadata" 
-            style="width: 100%; height: 420px;"
-            data-setup='{{"fluid": true, "playbackRates": [0.5, 1, 1.5, 2]}}'>
-            <source src="{st.session_state['stream_link']}" type="video/mp4">
-            <p class="vjs-no-js">Seu navegador não suporta JavaScript ou o formato do vídeo.</p>
+    <div style="background-color: #000; padding: 5px; border-radius: 8px; overflow: hidden;">
+        <video id="player" playsinline controls preload="metadata" style="width: 100%; height: 400px;">
+            <source src="{st.session_state['stream_link']}" type="video/mp4" />
         </video>
     </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {{
+            const player = new Plyr('#player', {{
+                controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'pip', 'fullscreen'],
+                ratio: '16:9',
+                tooltips: {{ controls: true, seek: true }}
+            }});
+        }});
+    </script>
     """
     
-    components.html(video_html, height=460)
+    components.html(video_html, height=430)
+    
+    # Rota de fuga caso o servidor do MediaFire derrube o streaming do arquivo de 6GB
+    st.info("💡 Se o player travar devido ao tamanho de 6GB, use o botão abaixo para abrir o streaming nativo direto da nuvem deles:")
+    st.link_button("🚀 Abrir Link Direto no Navegador", st.session_state["stream_link"], use_container_width=True)
