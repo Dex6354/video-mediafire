@@ -5,7 +5,6 @@ import requests
 import subprocess
 from bs4 import BeautifulSoup
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(page_title="MediaFire Dynamic Player", page_icon="🎬", layout="centered")
 st.title("🎬 Player Dinâmico")
@@ -86,9 +85,9 @@ if st.button("📥 Processar Vídeo", use_container_width=True, disabled=st.sess
             
             download_video_with_progress(link, SAVE_PATH)
             
-            # Limite estrito de 400MB para total estabilidade do streaming
+            # Limite de fragmentação
             total_size = os.path.getsize(SAVE_PATH)
-            max_part_size = 900 * 1024 * 1024  # 400 MB reais
+            max_part_size = 900 * 1024 * 1024
             st.session_state.num_parts = math.ceil(total_size / max_part_size)
             
             duration = get_video_duration(SAVE_PATH)
@@ -164,45 +163,25 @@ if available_parts:
     part_path = os.path.join(LOCAL_STATIC_DIR, selected_part)
     st.video(part_path)
     
-    # Injeta script invisível para escutar o término do vídeo
-    components.html(
-        """
-        <script>
-            function setupVideoListener() {
-                const videos = window.parent.document.querySelectorAll('video');
-                if (videos.length > 0) {
-                    const video = videos[videos.length - 1];
-                    video.onended = function() {
-                        const params = new URLSearchParams(window.parent.location.search);
-                        if (params.get('ended') !== 'true') {
-                            params.set('ended', 'true');
-                            window.parent.location.search = params.toString();
-                        }
-                    };
-                } else {
-                    setTimeout(setupVideoListener, 500);
-                }
-            }
-            setupVideoListener();
-        </script>
-        """,
-        height=0,
-        width=0,
-    )
-
-    # Verifica se o vídeo terminou pela URL e exibe o botão correspondente
-    if st.query_params.get("ended") == "true":
-        current_num = int(selected_part.split('_')[1].split('.')[0])
-        next_part_name = f"part_{current_num + 1}.mp4"
-        
-        if next_part_name in available_parts:
-            if st.button("⏭️ Próximo Vídeo de Corte", use_container_width=True):
-                st.session_state.selected_part_index = available_parts.index(next_part_name)
-                if "ended" in st.query_params:
-                    del st.query_params["ended"]
+    # Botões de Navegação Direta abaixo do player
+    col1, col2 = st.columns(2)
+    current_num = int(selected_part.split('_')[1].split('.')[0])
+    
+    with col1:
+        prev_part_name = f"part_{current_num - 1}.mp4"
+        if prev_part_name in available_parts:
+            if st.button("⏮️ Corte Anterior", use_container_width=True):
+                st.session_state.selected_part_index = available_parts.index(prev_part_name)
                 st.rerun()
-        else:
-            st.success("🎉 Você assistiu ao último fragmento disponível!")
+                
+    with col2:
+        next_part_name = f"part_{current_num + 1}.mp4"
+        if next_part_name in available_parts:
+            if st.button("⏭️ Próximo Corte", use_container_width=True):
+                st.session_state.selected_part_index = available_parts.index(next_part_name)
+                st.rerun()
+        elif not st.session_state.processing and current_num == st.session_state.num_parts:
+            st.success("🎉 Você chegou ao final do último fragmento!")
     
     if st.session_state.processing:
         st.info(f"🔄 Gerando próximas partes... ({len(available_parts)} de {st.session_state.num_parts} concluídas)")
@@ -214,6 +193,4 @@ elif not st.session_state.processing:
 if available_parts and not st.session_state.processing:
     if st.button("🗑️ Deletar todos os arquivos salvos"):
         clear_cache()
-        if "ended" in st.query_params:
-            del st.query_params["ended"]
         st.rerun()
