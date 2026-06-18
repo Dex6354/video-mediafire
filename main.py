@@ -1,67 +1,77 @@
 import streamlit as st
 
-st.set_page_config(page_title="Stream Cloud Player 6GB+", page_icon="🎬", layout="centered")
-st.title("🎬 Player de Alta Capacidade (6GB+ Cloud)")
+st.set_page_config(page_title="MediaFire Player Nuvem", page_icon="🎬", layout="centered")
+st.title("🎬 Player Web MediaFire Sem Download Local")
 
-st.markdown("""
-### 💡 Como configurar os links para funcionar na nuvem:
-* **Dropbox:** Altere o final do link de `?dl=0` para `?raw=1`
-* **Google Drive:** Use o formato de incorporação (Embed) fornecido pelo Drive.
-""")
+# Links originais públicos do MediaFire
+VIDEO_1_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file"
+VIDEO_2_URL = "https://www.mediafire.com/file/0ti5y6lprtk5pa5/TEVEO_1.mp4/file"
 
-# --- CONFIGURAÇÃO DOS LINKS TIPO STREAMING ---
-# Substitua os links abaixo pelos seus arquivos convertidos para streaming
-DROPBOX_SAMPLE = "https://www.dropbox.com/scl/fi/yx8example/sample.mp4?raw=1" 
-GOOGLE_DRIVE_EMBED = "https://drive.google.com/file/d/1_example_id/preview"
+st.markdown("---")
+st.subheader("Selecione o vídeo para assistir direto no navegador:")
 
-# Links de teste/exemplo que aceitam streaming direto no navegador:
-VIDEO_1_STREAM = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" # Link direto público (Teste 5MB)
-VIDEO_2_STREAM = "SUA_URL_DO_DROPBOX_AQUI?raw=1" # Substitua aqui para o seu de 6GB
+video_opcao = st.radio(
+    "Escolha o arquivo:",
+    ("Vídeo 1 (Sample - 5MB)", "Vídeo 2 (TEVEO 1 - 6GB)")
+)
 
-# Estado da sessão
-if "video_url" not in st.session_state:
-    st.session_state.video_url = None
-if "player_type" not in st.session_state:
-    st.session_state.player_type = "html5"
+url_selecionada = VIDEO_1_URL if "5MB" in video_opcao else VIDEO_2_URL
 
-col1, col2 = st.columns(2)
+# Injeta um player sandboxed onde o processamento do link e do streaming 
+# acontece integralmente no lado do cliente (navegador do usuário).
+# Consumo no Streamlit Cloud: 0% de RAM e 0% de Disco.
+st.components.v1.html(
+    f"""
+    <div style="background-color: #111; padding: 20px; border-radius: 8px; text-align: center; font-family: sans-serif; color: white;">
+        <h4 style="margin-top: 0;">Carregando Engine de Streaming do Cliente...</h4>
+        <p style="font-size: 13px; color: #aaa;">O navegador vai ler o arquivo de 6GB por demanda direto do MediaFire.</p>
+        
+        <div id="player-container" style="margin-top: 15px;">
+            <video id="videoPlayer" width="100%" height="360" controls preload="metadata" style="border-radius: 4px; background: black;">
+                <source src="" type="video/mp4">
+                Seu navegador não suporta streaming direto.
+            </video>
+        </div>
+        
+        <div style="margin-top: 15px;">
+            <a href="{url_selecionada}" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;">
+                🔗 Abrir na Aba Nativa do Navegador (Fallback)
+            </a>
+        </div>
+    </div>
 
-with col1:
-    if st.button("📺 Carregar Vídeo de Teste (Link Direto)", use_container_width=True):
-        st.session_state.video_url = VIDEO_1_STREAM
-        st.session_state.player_type = "html5"
-        st.rerun()
+    <script>
+        // Executado no contexto do usuário (contorna o bloqueio de IP do servidor)
+        async function resolverEPlay() {{
+            const videoUrl = "{url_selecionada}";
+            const player = document.getElementById('videoPlayer');
+            
+            try {{
+                // Faz a requisição simulando o navegador para pegar o downloadButton
+                const response = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(videoUrl));
+                const data = await response.json();
+                
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(data.contents, 'text/html');
+                const downloadBtn = doc.querySelector('#downloadButton');
+                
+                if (downloadBtn) {{
+                    const directLink = downloadBtn.getAttribute('href');
+                    player.src = directLink;
+                    player.load();
+                }} else {{
+                    console.log("Link direto não encontrado na árvore DOM.");
+                }}
+            }} catch (e) {{
+                console.error("Erro na resolução client-side:", e);
+            }}
+        }}
+        
+        // Inicializa a tentativa de bypass assim que o componente renderiza
+        resolverEPlay();
+    </script>
+    """,
+    height=520
+)
 
-with col2:
-    if st.button("🎬 Carregar Seu Vídeo Grande (6GB+)", use_container_width=True):
-        # Se for usar Google Drive Embed, mude player_type para "iframe"
-        st.session_state.video_url = VIDEO_2_STREAM 
-        st.session_state.player_type = "html5" 
-        st.rerun()
-
-# --- RENDERIZAÇÃO DOS PLAYERS COOPERAÇÃO TOTAL CLIENT-SIDE ---
-if st.session_state.video_url:
-    st.markdown("---")
-    
-    if st.session_state.video_url == "SUA_URL_DO_DROPBOX_AQUI?raw=1":
-        st.warning("⚠️ Substitua o link de teste no código pela URL gerada no seu Dropbox (com `?raw=1` no final).")
-
-    if st.session_state.player_type == "html5":
-        st.subheader("Player HTML5 Nativo (Aceleração por Hardware)")
-        # Este player força o navegador do usuário a puxar o arquivo por demanda
-        # Consumo no Streamlit Cloud: 0MB de RAM.
-        st.markdown(
-            f"""
-            <div style="background-color: black; padding: 5px; border-radius: 8px;">
-                <video width="100%" height="450" controls preload="metadata">
-                    <source src="{st.session_state.video_url}" type="video/mp4">
-                    Seu navegador não suporta a reprodução direta deste formato.
-                </video>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    
-    elif st.session_state.player_type == "iframe":
-        st.subheader("Player via Iframe Dedicado (Google Drive / OneDrive)")
-        st.components.v1.iframe(st.session_state.video_url, height=450, scrolling=False)
+st.info("💡 **Nota:** Arquivos de 6GB exigem uma conexão estável. Se o player integrado travar por restrições de segurança do MediaFire na sua rede, clique no botão azul para assistir na aba nativa do navegador.")
