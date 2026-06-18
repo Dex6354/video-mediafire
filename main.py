@@ -3,14 +3,14 @@ import requests
 from bs4 import BeautifulSoup
 import streamlit as st
 
-st.set_page_config(page_title="MediaFire Downloader & Player", page_icon="🎬", layout="centered")
-st.title("🎬 Baixar e Assistir Vídeos Grandes (6 GB+)")
+st.set_page_config(page_title="MediaFire 6GB Player", page_icon="🎬", layout="centered")
+st.title("🎬 Player Inabalável para Arquivos Grandes (6 GB+)")
 
-# Pasta simples para salvar o arquivo no disco do servidor
-LOCAL_DIR = "videos_temp"
-os.makedirs(LOCAL_DIR, exist_ok=True)
+# Salva na pasta static local para o Streamlit servir direto do HD (Consumo zero de RAM)
+LOCAL_STATIC_DIR = "static"
+os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
 VIDEO_FILENAME = "video_local_player.mp4"
-SAVE_PATH = os.path.join(LOCAL_DIR, VIDEO_FILENAME)
+SAVE_PATH = os.path.join(LOCAL_STATIC_DIR, VIDEO_FILENAME)
 
 # Links dos vídeos
 VIDEO_1_URL = "https://www.mediafire.com/file/pjkzoqvjnksr5bz/sample-5s.mp4/file?dkey=rqr7hg9tif0&r=1741"
@@ -47,7 +47,7 @@ def download_video_with_progress(direct_link, output_path):
         else:
             total_length = int(total_length)
             bytes_baixados = 0
-            chunk_size = 4096 * 1024  # Blocos de 4MB (Protege a memória RAM)
+            chunk_size = 4096 * 1024  # Blocos de 4MB salvos direto no HD
 
             for chunk in video_response.iter_content(chunk_size=chunk_size):
                 if chunk:
@@ -59,7 +59,6 @@ def download_video_with_progress(direct_link, output_path):
                     gb_baixados = bytes_baixados / (1024 ** 3)
                     gb_totais = total_length / (1024 ** 3)
                     
-                    # Atualização na tela
                     status_text.text(f"Progresso: {porcentagem}% ({gb_baixados:.2f} GB de {gb_totais:.2f} GB)")
                     progress_bar.progress(bytes_baixados / total_length)
 
@@ -90,10 +89,21 @@ with col2:
         except Exception as e:
             st.error(f"Erro: {e}")
 
-# Exibe o player nativo apontando diretamente para o arquivo salvo no HD
+# Renderização segura via HTML nativo injetado no DOM principal do Streamlit
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
-    st.subheader("🎬 Player de Vídeo (Executando direto do disco local):")
+    st.subheader("🎬 Player Local via Stream Estático (Suporta avanço e arquivos gigantes):")
     
-    # Passando o caminho como string, o Streamlit faz o streaming streaming nativo do arquivo de 6GB sem travar
-    st.video(SAVE_PATH)
+    # Usando st.markdown com caminho relativo, o navegador conversa direto com o servidor web 
+    # do Streamlit (Tornado), solicitando apenas pedaços (Range Requests) do arquivo de 6GB.
+    st.markdown(
+        f"""
+        <div style="background-color: black; padding: 5px; border-radius: 8px;">
+            <video width="100%" height="auto" controls preload="metadata">
+                <source src="app/static/{VIDEO_FILENAME}" type="video/mp4">
+                Seu navegador não suporta HTML5 video.
+            </video>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
