@@ -2,11 +2,12 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import streamlit as st
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="MediaFire 6GB Player", page_icon="🎬", layout="centered")
-st.title("🎬 Player Inabalável para Arquivos Grandes (6 GB+)")
+st.set_page_config(page_title="MediaFire 6GB Ultra-Player", page_icon="🎬", layout="centered")
+st.title("🎬 Player Industrial para Arquivos Gigantes (6 GB+)")
 
-# Salva na pasta static local para o Streamlit servir direto do HD
+# Garante a pasta estática local
 LOCAL_STATIC_DIR = "static"
 os.makedirs(LOCAL_STATIC_DIR, exist_ok=True)
 VIDEO_FILENAME = "video_local_player.mp4"
@@ -89,24 +90,28 @@ with col2:
         except Exception as e:
             st.error(f"Erro: {e}")
 
-# Renderização corrigida e otimizada para o arquivo local
+# Renderização com Plyr e rota absoluta corrigida (/static/...)
 if os.path.exists(SAVE_PATH):
     st.markdown("---")
-    st.subheader("🎬 Player Local (Executando direto do HD local):")
+    st.subheader("🎬 Player Plyr Engine (Executando do HD com alta performance):")
     
-    # Caminho corrigido para o servidor estático do Streamlit
-    st.markdown(
-        f"""
-        <div style="background-color: black; padding: 5px; border-radius: 8px;">
-            <video width="100%" height="auto" controls preload="auto">
-                <source src="static/{VIDEO_FILENAME}" type="video/mp4">
-                Seu navegador não suporta a reprodução deste arquivo local.
-            </video>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    # A barra '/' antes de 'static' força o player do componente a buscar na raiz do servidor web
+    video_html = f"""
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
     
-    # Botão de contingência absoluta para abrir o arquivo local direto em tela cheia no navegador
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.link_button("📺 Abrir Player Nativo em Nova Aba", f"static/{VIDEO_FILENAME}", use_container_width=True)
+    <div style="background-color: #000; padding: 5px; border-radius: 8px; overflow: hidden;">
+        <video id="player" playsinline controls preload="auto" style="width: 100%; height: 400px;">
+            <source src="/static/{VIDEO_FILENAME}" type="video/mp4" />
+        </video>
+    </div>
+    
+    <script>
+        const player = new Plyr('#player', {{
+            controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings', 'pip', 'fullscreen'],
+            ratio: '16:9',
+            blankVideo: ''
+        }});
+    </script>
+    """
+    components.html(video_html, height=440)
